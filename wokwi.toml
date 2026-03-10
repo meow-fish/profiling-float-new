@@ -1,0 +1,5 @@
+[wokwi]
+version = 1
+firmware = ".pio/build/wokwi_stepper_auto/firmware.bin"
+elf = ".pio/build/wokwi_stepper_auto/firmware.elf"
+rfc2217ServerPort = 4000
