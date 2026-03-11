@@ -1,6 +1,8 @@
 #include "DepthControl.h"
 #include "FloatStepper.h"
 #include "PressureSensor.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 void DepthController::init(FloatStepper& stepper, PressureSensor& sensor) {
     _stepper = &stepper;
@@ -74,28 +76,32 @@ void DepthController::runDepthHold(const DiveParams& params) {
     float targetPressure = _sensor->calculateTargetPressure(params.targetDepthMeters);
 
     // 5. Depth-hold feedback loop
+    //    Runs at a fixed interval (default 5 Hz).  A pressure deadband
+    //    prevents the motor from oscillating when the float is near the
+    //    target depth — the MS5837 noise floor is ~0.2 mbar, so the
+    //    deadband must be comfortably above that.
     unsigned long startTime = millis();
-    int stepCount = _stepper->getStepCount();
-    int minSteps  = params.targetDepthSteps - params.holdRangeSteps;
-    int maxSteps  = params.targetDepthSteps + params.holdRangeSteps;
+    int minSteps = params.targetDepthSteps - params.holdRangeSteps;
+    int maxSteps = params.targetDepthSteps + params.holdRangeSteps;
 
     while ((millis() - startTime) < params.holdDurationMs) {
         _sensor->read();
-        stepCount = _stepper->getStepCount();
+        float error    = _sensor->getPressure() - targetPressure;
+        int   stepCount = _stepper->getStepCount();
 
-        if (_sensor->getPressure() > targetPressure && stepCount > minSteps) {
+        if (error > DEPTHHOLD_DEADBAND_MBAR && stepCount > minSteps) {
             // Too deep — retract (ascend) if not at top limit
             if (!_stepper->isAtLimit(false)) {
                 _stepper->stepBatch(MOTOR_STEP_BATCH, false);
             }
-        } else if (_sensor->getPressure() < targetPressure && stepCount < maxSteps) {
+        } else if (error < -DEPTHHOLD_DEADBAND_MBAR && stepCount < maxSteps) {
             // Too shallow — extend (descend) if not at bottom limit
             if (!_stepper->isAtLimit(true)) {
                 _stepper->stepBatch(MOTOR_STEP_BATCH, true);
             }
         }
 
-        taskYIELD();
+        vTaskDelay(pdMS_TO_TICKS(DEPTHHOLD_LOOP_INTERVAL_MS));
     }
 
     // 6. Restore speed and ascend home

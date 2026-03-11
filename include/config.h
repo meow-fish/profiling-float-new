@@ -51,10 +51,12 @@
 // Dive Sequence Parameters
 // =============================================================
 
-#define BOTTOM_DWELL_MS        45000     // Dwell time at bottom (ms)
-#define DEPTHHOLD_TIMEOUT_MS   120000    // Max depth-hold duration (ms)
-#define DEPTHHOLD_RANGE_STEPS  300       // +/- step tolerance around midpoint
-#define DEPTHHOLD_MIDPOINT     3300      // Default midpoint in steps
+#define BOTTOM_DWELL_MS            45000     // Dwell time at bottom (ms)
+#define DEPTHHOLD_TIMEOUT_MS       120000    // Max depth-hold duration (ms)
+#define DEPTHHOLD_RANGE_STEPS      300       // +/- step tolerance around midpoint
+#define DEPTHHOLD_MIDPOINT         3300      // Default midpoint in steps
+#define DEPTHHOLD_DEADBAND_MBAR    5.0f      // Pressure deadband (mbar, ≈ 5 cm water)
+#define DEPTHHOLD_LOOP_INTERVAL_MS 200       // Control loop period (ms, 5 Hz)
 
 // =============================================================
 // FreeRTOS Task Configuration

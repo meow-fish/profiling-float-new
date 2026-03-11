@@ -10,11 +10,14 @@ public:
 
     /// Step a fixed number of pulses in the given direction.
     /// clockwise=true → direction pin LOW (descend).
+    /// Uses software bit-banging — suitable for small batch sizes.
     void stepBatch(int steps, bool clockwise);
 
     /// Run continuously in one direction until the corresponding limit
     /// switch is triggered. clockwise=true runs until bottom limit,
     /// clockwise=false runs until top limit.
+    /// Uses ESP32 LEDC hardware to generate pulses, freeing the CPU
+    /// while the motor runs.
     void runToLimit(bool clockwise);
 
     /// Change the pulse delay (microseconds between step edges).
@@ -40,7 +43,17 @@ private:
     int _speed;
     int _stepCount;
 
+    /// Software pulse for stepBatch().
     void pulseStep();
+
+    /// Start LEDC hardware pulse output on the step pin.
+    void startHwPulses();
+
+    /// Stop LEDC output and restore the step pin to regular GPIO.
+    void stopHwPulses();
+
+    /// Convert speed setting (microsecond half-period) to frequency in Hz.
+    uint32_t speedToFrequencyHz() const;
 };
 
 #endif // FLOAT_STEPPER_H
