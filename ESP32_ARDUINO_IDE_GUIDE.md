@@ -1,235 +1,294 @@
-# ESP32 Setup Guide for Arduino IDE
+# Getting Started with PlatformIO — A Guide for Arduino IDE Users
 
-This guide walks you through setting up, building, and uploading the Profiling Float
-firmware using the **Arduino IDE**. It assumes you are already comfortable with the
-Arduino IDE but have not used it with an ESP32 before.
+This guide is for people who have used the **Arduino IDE** before and want to set up
+this project using **PlatformIO in VS Code**. It explains PlatformIO concepts by
+relating them to things you already know from the Arduino IDE.
+
+No prior PlatformIO experience is needed. Every step is explained.
 
 ---
 
 ## Table of Contents
 
-- [What You Need Before Starting](#what-you-need-before-starting)
-- [Step 1: Add ESP32 Board Support](#step-1-add-esp32-board-support)
-- [Step 2: Install the Required Library](#step-2-install-the-required-library)
-- [Step 3: Configure Board Settings](#step-3-configure-board-settings)
-- [Step 4: Prepare the Code for Arduino IDE](#step-4-prepare-the-code-for-arduino-ide)
-  - [Option A: Copy Libraries to Arduino Libraries Folder](#option-a-copy-libraries-to-arduino-libraries-folder)
-  - [Option B: Flatten Everything into One Sketch](#option-b-flatten-everything-into-one-sketch)
-- [Step 5: Upload the Firmware](#step-5-upload-the-firmware)
-- [Step 6: Open the Serial Monitor](#step-6-open-the-serial-monitor)
-- [Step 7: Connect to the Float](#step-7-connect-to-the-float)
-- [Over-The-Air (OTA) Updates](#over-the-air-ota-updates)
+- [Why PlatformIO Instead of Arduino IDE?](#why-platformio-instead-of-arduino-ide)
+- [What You Need](#what-you-need)
+- [Step 1: Install VS Code](#step-1-install-vs-code)
+- [Step 2: Install the PlatformIO Extension](#step-2-install-the-platformio-extension)
+- [Step 3: Open the Project](#step-3-open-the-project)
+- [Step 4: Understanding the Project Layout](#step-4-understanding-the-project-layout)
+- [Step 5: Build the Firmware](#step-5-build-the-firmware)
+- [Step 6: Upload to the ESP32](#step-6-upload-to-the-esp32)
+- [Step 7: Open the Serial Monitor](#step-7-open-the-serial-monitor)
+- [Step 8: Connect to the Float](#step-8-connect-to-the-float)
 - [Running Test Sketches](#running-test-sketches)
+- [Over-The-Air (OTA) Updates](#over-the-air-ota-updates)
+- [Editing the Code](#editing-the-code)
+- [PlatformIO vs Arduino IDE — Quick Reference](#platformio-vs-arduino-ide--quick-reference)
 - [Troubleshooting](#troubleshooting)
-- [Differences from PlatformIO](#differences-from-platformio)
 
 ---
 
-## What You Need Before Starting
+## Why PlatformIO Instead of Arduino IDE?
 
-- **Arduino IDE 2.x** (download from https://www.arduino.cc/en/software)
-- **ESP32 development board** connected via USB
-- **A USB cable that carries data** (some cheap cables are charge-only)
+If you have used the Arduino IDE, you know that:
+- You have to manually install board packages and libraries.
+- All your code usually lives in one `.ino` file (or you have to manually manage
+  multiple tabs).
+- Board settings (speed, flash size, partition scheme) are selected from dropdown
+  menus, and it is easy to forget one.
+
+PlatformIO solves these problems:
+
+| Pain point in Arduino IDE | How PlatformIO fixes it |
+|---|---|
+| Manually installing ESP32 board package | PlatformIO downloads it automatically when you build |
+| Manually installing libraries (Library Manager) | Libraries are listed in `platformio.ini` and installed automatically |
+| Choosing board settings from dropdown menus | All settings are saved in `platformio.ini` — everyone gets the same config |
+| One big `.ino` file or awkward multi-tab setup | Code is split into clean folders (`src/`, `lib/`, `include/`) and it just works |
+| Switching between board types requires re-selecting settings | Define multiple environments in `platformio.ini` and switch with one command |
+
+**In short**: you clone the project, open it in VS Code, and everything is
+already configured. No manual setup needed.
+
+---
+
+## What You Need
+
+- A computer (Windows, macOS, or Linux)
+- An ESP32 development board
+- A USB cable that carries data (some cheap cables are charge-only)
 - All hardware wired up as described in the [main README](README.md#pin-connections)
   or the [Testing Guide](TESTING_GUIDE.md#part-3-wiring-step-by-step)
 
 ---
 
-## Step 1: Add ESP32 Board Support
+## Step 1: Install VS Code
 
-The Arduino IDE does not include ESP32 support by default. You need to add it.
+PlatformIO runs as an extension inside **Visual Studio Code** (VS Code). VS Code
+is a free code editor from Microsoft — it is not the same as Visual Studio.
 
-1. Open Arduino IDE.
-2. Go to **File > Preferences** (on macOS: **Arduino IDE > Preferences**).
-3. Find the field labelled **"Additional boards manager URLs"**.
-4. Paste this URL into the field:
-   ```
-   https://dl.espressif.com/dl/package_esp32_index.json
-   ```
-   If there are already other URLs in the field, click the icon to the right of
-   the field and add the new URL on a separate line.
-5. Click **OK**.
-6. Go to **Tools > Board > Boards Manager**.
-7. In the search box, type **esp32**.
-8. Find **"esp32 by Espressif Systems"** and click **Install**. This downloads
-   about 300 MB of tools and board definitions. Wait for it to finish.
+1. Go to https://code.visualstudio.com and download the installer for your
+   operating system.
+2. Run the installer and follow the prompts. The defaults are fine.
+3. Open VS Code.
 
-After installation, you should see ESP32 boards listed under **Tools > Board**.
+> **If you already have VS Code installed**, skip this step.
 
 ---
 
-## Step 2: Install the Required Library
+## Step 2: Install the PlatformIO Extension
 
-The firmware uses the BlueRobotics MS5837 library to communicate with the
-pressure/temperature sensor.
+This is like installing the ESP32 board package in Arduino IDE, except PlatformIO
+handles all boards and libraries in one go.
 
-1. Go to **Sketch > Include Library > Manage Libraries** (or click the library
-   icon in the left sidebar on Arduino IDE 2.x).
-2. In the search box, type **MS5837**.
-3. Find **"BlueRobotics MS5837 Library"** by BlueRobotics.
-4. Click **Install**.
+1. Open VS Code.
+2. Click the **Extensions** icon in the left sidebar (it looks like four small
+   squares, or press **Ctrl+Shift+X**).
+3. In the search box at the top, type **PlatformIO IDE**.
+4. Find the extension by **PlatformIO** (it should be the first result) and
+   click **Install**.
+5. Wait for the installation to complete. This may take a few minutes — PlatformIO
+   downloads its core tools in the background.
+6. When it finishes, you will see a small **house icon** (PlatformIO Home) appear
+   in the bottom toolbar. You may also be prompted to reload VS Code — click
+   **Reload** if so.
 
-That is the only external library needed. Everything else (WiFi, WebServer,
-Wire, FreeRTOS) is already included with the ESP32 board package.
+That is it. You do not need to install the ESP32 board package separately — PlatformIO
+will download it automatically the first time you build.
 
 ---
 
-## Step 3: Configure Board Settings
+## Step 3: Open the Project
 
-Go to **Tools** and set the following:
+1. If you have not already, download or clone this repository to your computer.
+   You can use the green **Code** button on the GitHub page and choose
+   **Download ZIP**, then unzip it. Or if you have Git installed:
+   ```bash
+   git clone <this-repo-url>
+   ```
 
-| Setting | Value |
+2. In VS Code, go to **File > Open Folder** (on macOS: **File > Open...**).
+
+3. Navigate to the `profiling-float-new` folder and click **Open** (or
+   **Select Folder** on Windows).
+
+4. VS Code will detect the `platformio.ini` file and recognise this as a
+   PlatformIO project. You may see a notification: *"PlatformIO: Installing
+   platform espressif32..."*. Let it finish — this is PlatformIO automatically
+   downloading the ESP32 toolchain and libraries. This only happens once.
+
+> **Arduino IDE equivalent**: This is like opening a `.ino` file, but instead of
+> one file, you are opening the entire project folder. PlatformIO reads the
+> `platformio.ini` file to know what board, libraries, and settings to use.
+
+---
+
+## Step 4: Understanding the Project Layout
+
+In the Arduino IDE, your code lives in a single `.ino` file (or multiple tabs
+in the same sketch). In PlatformIO, the project is organised into folders:
+
+```
+profiling-float-new/
+├── platformio.ini              ← The "settings" file (like Tools menu in Arduino IDE)
+├── include/
+│   └── config.h                ← Pin assignments, WiFi credentials, constants
+├── src/
+│   └── main.cpp                ← The main sketch (like your .ino file)
+├── lib/
+│   ├── Stepper/                ← Motor control library
+│   ├── Sensor/                 ← Pressure sensor library
+│   ├── Network/                ← WiFi and web server library
+│   └── DepthControl/           ← Dive logic library
+└── test/
+    ├── manual_stepper/         ← Test sketch for motor
+    ├── pressure_only/          ← Test sketch for sensor
+    └── button_test/            ← Test sketch for buttons
+```
+
+Here is how each part maps to what you know:
+
+| PlatformIO | Arduino IDE equivalent |
 |---|---|
-| **Board** | ESP32 Dev Module |
-| **Upload Speed** | 921600 (use 115200 if uploads fail) |
-| **CPU Frequency** | 240MHz (WiFi/BT) |
-| **Flash Frequency** | 80MHz |
-| **Flash Mode** | QIO |
-| **Flash Size** | 4MB (32Mb) |
-| **Partition Scheme** | Minimal SPIFFS (1.9MB APP with OTA/190KB SPIFFS) |
-| **Port** | Select the USB serial port your ESP32 is connected to |
+| `platformio.ini` | **Tools** menu (board, speed, partition scheme) + **Library Manager** |
+| `src/main.cpp` | Your `.ino` sketch file |
+| `lib/` folders | Libraries you install via **Sketch > Include Library > Manage Libraries** |
+| `include/config.h` | Constants you would put at the top of your `.ino` file |
+| `test/` folders | Separate sketches you would open in a new Arduino IDE window |
 
-The **Partition Scheme** setting is important. The firmware uses OTA updates,
-which require a partition layout that reserves space for two firmware images.
-"Minimal SPIFFS" is the same partition scheme used by the PlatformIO build
-(`min_spiffs.csv`).
+### A closer look at `platformio.ini`
 
-### Finding the correct Port
+Open `platformio.ini` in VS Code. You will see something like this:
 
-- **Windows**: Look for a COM port (e.g., `COM3`). If you do not see one,
-  install the CP2102 or CH340 USB driver for your ESP32 board.
-- **macOS**: Look for `/dev/cu.usbserial-XXXX` or `/dev/cu.SLAB_USBtoUART`.
-- **Linux**: Look for `/dev/ttyUSB0` or `/dev/ttyACM0`.
+```ini
+[env:esp32]
+platform = espressif32          ; ← Like selecting "ESP32" in Boards Manager
+board = esp32dev                ; ← Like selecting "ESP32 Dev Module" in Tools > Board
+framework = arduino             ; ← We are using the Arduino framework (same as Arduino IDE)
+monitor_speed = 115200          ; ← Serial monitor baud rate
+upload_speed = 921600           ; ← Upload speed
+lib_deps =
+    bluerobotics/BlueRobotics MS5837 Library@^1.1.1   ; ← Like installing a library
+board_build.partitions = min_spiffs.csv                ; ← Like Tools > Partition Scheme
+```
 
-If no port appears, try a different USB cable — yours may be charge-only.
-
----
-
-## Step 4: Prepare the Code for Arduino IDE
-
-This project uses a PlatformIO-style layout with separate library folders under
-`lib/`. The Arduino IDE does not automatically recognise this structure, so you
-need to do one of the following.
-
-### Option A: Copy Libraries to Arduino Libraries Folder (Recommended)
-
-This approach keeps the source files untouched and is easiest to maintain.
-
-1. Find your Arduino libraries folder:
-   - **Windows**: `C:\Users\<YourName>\Documents\Arduino\libraries\`
-   - **macOS**: `~/Documents/Arduino/libraries/`
-   - **Linux**: `~/Arduino/libraries/`
-
-2. Copy each library folder from this project into that location:
-
-   ```
-   Copy:  lib/Stepper/       →  Arduino/libraries/FloatStepper/
-   Copy:  lib/Sensor/        →  Arduino/libraries/PressureSensor/
-   Copy:  lib/Network/       →  Arduino/libraries/FloatWebServer/
-   Copy:  lib/DepthControl/  →  Arduino/libraries/DepthControl/
-   ```
-
-   Each copied folder should contain the `.h` and `.cpp` files directly
-   (not inside a subfolder).
-
-3. Copy the config header so the libraries can find it:
-
-   ```
-   Copy:  include/config.h   →  Arduino/libraries/FloatConfig/config.h
-   ```
-
-   Create the `FloatConfig` folder if it does not exist.
-
-4. Now open the main sketch. In the Arduino IDE, go to **File > Open** and
-   navigate to:
-
-   ```
-   src/main.cpp
-   ```
-
-   Arduino IDE requires `.ino` files, so **rename** (or copy) this file:
-
-   ```
-   Copy:  src/main.cpp  →  ProfilingFloat/ProfilingFloat.ino
-   ```
-
-   The `.ino` file must be inside a folder with the same name. Create a folder
-   called `ProfilingFloat` and put `ProfilingFloat.ino` inside it.
-
-5. Open `ProfilingFloat/ProfilingFloat.ino` in the Arduino IDE. It should
-   compile without errors.
-
-### Option B: Flatten Everything into One Sketch
-
-If you prefer a single file, you can combine all the source code into one
-`.ino` sketch. This is harder to maintain but avoids touching the libraries
-folder.
-
-1. Create a new sketch in Arduino IDE (**File > New Sketch**).
-2. Save it as `ProfilingFloat`.
-3. Delete the default contents and paste in the following order:
-   - The contents of `include/config.h` (remove the `#ifndef`/`#define`/`#endif` guards)
-   - The contents of `lib/Stepper/FloatStepper.h` (remove include guards)
-   - The contents of `lib/Stepper/FloatStepper.cpp` (remove the `#include "FloatStepper.h"` line)
-   - The contents of `lib/Sensor/PressureSensor.h` (remove include guards)
-   - The contents of `lib/Sensor/PressureSensor.cpp` (remove the `#include "PressureSensor.h"` line)
-   - The contents of `lib/Network/FloatWebServer.h` (remove include guards)
-   - The contents of `lib/Network/FloatWebServer.cpp` (remove the `#include "FloatWebServer.h"` line)
-   - The contents of `lib/DepthControl/DepthControl.h` (remove include guards)
-   - The contents of `lib/DepthControl/DepthControl.cpp` (remove the `#include "DepthControl.h"` line)
-   - The contents of `src/main.cpp` (remove the individual `#include` lines for
-     the above headers since they are now inline)
-4. Make sure `#include <Arduino.h>` appears only once, at the very top.
-5. Keep all the standard library includes: `<Wire.h>`, `<WiFi.h>`,
-   `<WebServer.h>`, `<ArduinoOTA.h>`, `<Update.h>`, `<MS5837.h>`, and
-   the FreeRTOS headers.
-
-This is error-prone. Option A is recommended.
+Everything you would normally set through dropdown menus in the Arduino IDE is
+written here as text. The advantage is that anyone who opens this project gets
+the exact same settings — no need to remember which partition scheme to pick.
 
 ---
 
-## Step 5: Upload the Firmware
+## Step 5: Build the Firmware
 
-1. Connect the ESP32 to your computer via USB.
-2. Make sure the correct **Board** and **Port** are selected under **Tools**.
-3. Click the **Upload** button (right arrow icon) or press **Ctrl+U**
-   (Cmd+U on macOS).
-4. Wait for the compilation and upload to finish. You should see
-   `"Done uploading"` at the bottom.
+"Building" means compiling the code, just like clicking **Verify** (the checkmark)
+in the Arduino IDE. It checks for errors but does not upload anything yet.
+
+### Using the toolbar (GUI way)
+
+Look at the **bottom toolbar** in VS Code (the blue or dark bar at the very
+bottom of the window). You should see these PlatformIO icons:
+
+```
+ ✓ (Build)    → (Upload)    🔌 (Serial Monitor)    🏠 (PlatformIO Home)
+```
+
+Click the **checkmark** (✓) to build. You can also hover over the icons to
+see their labels.
+
+### Using the terminal (command way)
+
+Open the VS Code terminal with **Ctrl+`** (backtick) or **Terminal > New
+Terminal**, then type:
+
+```bash
+pio run
+```
+
+### What to expect
+
+The first build takes longer because PlatformIO downloads the ESP32 toolchain
+and the MS5837 library. Subsequent builds are much faster.
+
+When the build succeeds, you will see:
+
+```
+========================= [SUCCESS] Took X.XXs =========================
+```
+
+If you see errors, check the [Troubleshooting](#troubleshooting) section.
+
+> **Arduino IDE equivalent**: `pio run` = clicking the **Verify** button (✓).
+
+---
+
+## Step 6: Upload to the ESP32
+
+### Connect the board
+
+1. Plug the ESP32 into your computer via USB.
+2. PlatformIO should automatically detect the serial port. If not, see
+   [Troubleshooting](#troubleshooting).
+
+### Upload
+
+**GUI way**: Click the **right arrow** (→) in the bottom toolbar.
+
+**Terminal way**:
+```bash
+pio run -t upload
+```
+
+You will see progress output as the firmware is compiled (if needed) and
+flashed to the board. When it finishes:
+
+```
+========================= [SUCCESS] Took X.XXs =========================
+```
 
 ### If the upload fails
 
-- **"Failed to connect" or "A fatal error occurred"**: Hold down the **BOOT**
-  button on the ESP32 board while the IDE shows `"Connecting..."`, then release
-  it once the upload starts.
-- **Timeout errors**: Lower the upload speed to 115200 under
-  **Tools > Upload Speed**.
-- **Port not found**: Check the USB cable, try a different port, or install
-  the USB-to-serial driver for your board (CP2102 or CH340).
+- **"Failed to connect to ESP32"**: Hold the **BOOT** button on the ESP32
+  while the upload starts, then release it once you see upload progress.
+- **Timeout errors**: Try lowering the upload speed. Open `platformio.ini` and
+  change `upload_speed = 921600` to `upload_speed = 115200`.
+- **Port not found**: Check that your USB cable carries data. Try a different
+  cable. On Windows, you may need to install the CP2102 or CH340 USB driver.
+
+> **Arduino IDE equivalent**: `pio run -t upload` = clicking the **Upload**
+> button (→) or pressing Ctrl+U.
 
 ---
 
-## Step 6: Open the Serial Monitor
+## Step 7: Open the Serial Monitor
 
-1. Go to **Tools > Serial Monitor** (or click the magnifying glass icon in the
-   top-right corner).
-2. Set the baud rate to **115200** (dropdown at the bottom-right of the serial
-   monitor).
-3. You should see:
-   ```
-   Profiling Float — initialising...
-   MS5837 sensor OK
-   Stepper motor OK
-   All tasks started. System ready.
-   ```
+The serial monitor works just like in the Arduino IDE — it shows text that the
+ESP32 prints via `Serial.println()`.
 
-If you see `"ERROR: MS5837 sensor not detected. Halting."`, the pressure sensor
-is not wired correctly or not connected. See the
-[Troubleshooting](#troubleshooting) section.
+**GUI way**: Click the **plug icon** (🔌) in the bottom toolbar.
+
+**Terminal way**:
+```bash
+pio device monitor
+```
+
+You should see:
+
+```
+Profiling Float — initialising...
+MS5837 sensor OK
+Stepper motor OK
+All tasks started. System ready.
+```
+
+To exit the serial monitor, press **Ctrl+C**.
+
+> **Arduino IDE equivalent**: `pio device monitor` = **Tools > Serial Monitor**.
+> The baud rate is already set to 115200 in `platformio.ini` (`monitor_speed`),
+> so you do not need to select it manually.
 
 ---
 
-## Step 7: Connect to the Float
+## Step 8: Connect to the Float
 
 Once the firmware is running:
 
@@ -241,134 +300,230 @@ Once the firmware is running:
 4. You should see the control panel with buttons for starting dives.
 
 See the [main README](README.md#using-the-float) for full details on the web
-interface and available endpoints.
-
----
-
-## Over-The-Air (OTA) Updates
-
-Once the firmware is running and you are connected to the float's WiFi, you can
-upload new firmware without a USB cable.
-
-1. Connect your computer to the `SSCFloat` WiFi network.
-2. In the Arduino IDE, go to **Tools > Port**.
-3. You should see a network port appear, something like:
-   ```
-   192.168.4.1 (ESP32 OTA)
-   ```
-4. Select that network port.
-5. Click **Upload** as normal. The firmware will be sent over WiFi.
-
-If the network port does not appear:
-- Make sure you are connected to the float's WiFi.
-- Restart the Arduino IDE (it sometimes needs a restart to discover network ports).
-- Make sure the currently-running firmware includes the OTA code — if you
-  previously uploaded firmware without OTA, you will need to use USB to recover.
+endpoints.
 
 ---
 
 ## Running Test Sketches
 
-The project includes test sketches in the `test/` folder for verifying individual
-components. To use these with the Arduino IDE:
+In the Arduino IDE, you would open a different `.ino` file to run a test sketch.
+In PlatformIO, the project defines multiple **environments** in `platformio.ini`,
+one for each test sketch. You switch between them by name.
 
-### Pressure sensor test (`test/pressure_only/main.cpp`)
+The available environments are:
 
-1. Copy `test/pressure_only/main.cpp` to a new sketch folder:
+| Environment name | What it does |
+|---|---|
+| `esp32` | Full production firmware (motor + sensor + WiFi) |
+| `test_manual_stepper` | Manual motor control via serial commands |
+| `test_pressure` | Pressure sensor test with WiFi data endpoint |
+| `test_buttons` | Button and LED verification |
+| `wokwi_stepper_debug` | Interactive motor debug (for Wokwi simulation or real hardware) |
+| `wokwi_stepper_auto` | Automatic motor test (for Wokwi simulation or real hardware) |
+
+### To build and upload a specific test
+
+Add `-e <environment_name>` to the command. For example, to upload the pressure
+sensor test:
+
+```bash
+pio run -e test_pressure -t upload
+```
+
+To upload the manual stepper test:
+
+```bash
+pio run -e test_manual_stepper -t upload
+```
+
+After uploading, open the serial monitor as usual:
+
+```bash
+pio device monitor
+```
+
+### Using the GUI to switch environments
+
+1. Look at the bottom toolbar in VS Code. You should see the current
+   environment name (e.g., `esp32`).
+2. Click on it. A list of available environments appears at the top of the
+   window.
+3. Select the one you want.
+4. Now the build/upload buttons will use that environment.
+
+> **Arduino IDE equivalent**: Switching environments is like opening a completely
+> different sketch, except here all the sketches live in the same project and
+> share the same libraries and settings.
+
+---
+
+## Over-The-Air (OTA) Updates
+
+Once the firmware is running, you can upload updates over WiFi instead of USB.
+This is useful when the float is assembled and you cannot easily reach the USB
+port.
+
+1. Connect your computer to the float's WiFi network (`SSCFloat`).
+2. Open `platformio.ini` and uncomment these two lines (remove the `;`):
+   ```ini
+   upload_protocol = espota
+   upload_port = 192.168.4.1
    ```
-   PressureTest/PressureTest.ino
+3. Upload as normal:
+   ```bash
+   pio run -t upload
    ```
-2. This test requires the MS5837 library (already installed in Step 2) and
-   the Sensor library (already copied in Step 4A).
-3. Upload and open the serial monitor.
 
-### Manual stepper test (`test/manual_stepper/main.cpp`)
+The firmware will be sent over WiFi instead of USB.
 
-1. Copy `test/manual_stepper/main.cpp` to a new sketch folder:
-   ```
-   ManualStepperTest/ManualStepperTest.ino
-   ```
-2. This test needs the Stepper library copied in Step 4A.
-3. Upload and use the serial monitor to send commands.
+**To switch back to USB upload**, comment those two lines out again (add `;` at
+the start).
 
-### Button test (`test/button_test/main.cpp`)
+> **Arduino IDE equivalent**: In the Arduino IDE, you would select the network
+> port under **Tools > Port**. In PlatformIO, you set it in `platformio.ini`.
 
-1. Copy `test/button_test/main.cpp` to a new sketch folder:
-   ```
-   ButtonTest/ButtonTest.ino
-   ```
-2. Upload and check the serial monitor for button state output.
+---
 
-For each test sketch, check the `#include` lines at the top of the file. If it
-includes `"config.h"` or any of the project libraries, make sure you have
-completed Step 4A (copied the libraries to your Arduino libraries folder).
+## Editing the Code
+
+VS Code is a full code editor with features the Arduino IDE does not have:
+
+- **Autocomplete**: Start typing a function name and VS Code suggests completions.
+- **Go to definition**: Ctrl+click (Cmd+click on macOS) on any function or
+  variable name to jump to where it is defined.
+- **Find all references**: Right-click a function name and select
+  **"Find All References"** to see everywhere it is used.
+- **Syntax errors**: Red underlines appear as you type, before you even build.
+- **Integrated terminal**: The terminal is built into the editor — no need to
+  switch windows.
+
+### Where to make changes
+
+| What you want to change | File to edit |
+|---|---|
+| Pin assignments, WiFi name/password, motor speed, dive timings | `include/config.h` |
+| Main program flow (setup, loop, task creation) | `src/main.cpp` |
+| Motor control logic | `lib/Stepper/FloatStepper.cpp` |
+| Pressure sensor readings and buffering | `lib/Sensor/PressureSensor.cpp` |
+| WiFi, web endpoints, OTA | `lib/Network/FloatWebServer.cpp` |
+| Dive sequences (simple and depth-hold) | `lib/DepthControl/DepthControl.cpp` |
+
+After editing, just build and upload again (`pio run -t upload`).
+
+---
+
+## PlatformIO vs Arduino IDE — Quick Reference
+
+This table translates everything you know from the Arduino IDE into PlatformIO
+commands and concepts.
+
+### Common actions
+
+| Arduino IDE | PlatformIO (toolbar) | PlatformIO (terminal) |
+|---|---|---|
+| Click **Verify** (✓) | Click ✓ in bottom bar | `pio run` |
+| Click **Upload** (→) | Click → in bottom bar | `pio run -t upload` |
+| **Tools > Serial Monitor** | Click 🔌 in bottom bar | `pio device monitor` |
+| **Tools > Board > ESP32 Dev Module** | Already set in `platformio.ini` | — |
+| **Tools > Port > COM3** | Auto-detected | `pio run -t upload --upload-port COM3` |
+| **Sketch > Include Library > Manage Libraries** | Listed in `platformio.ini` under `lib_deps` | `pio lib install <name>` |
+| Open a different `.ino` sketch | Switch environment (`-e <name>`) | `pio run -e test_pressure` |
+
+### Settings
+
+| Arduino IDE (Tools menu) | PlatformIO (`platformio.ini`) |
+|---|---|
+| Board: ESP32 Dev Module | `board = esp32dev` |
+| Upload Speed: 921600 | `upload_speed = 921600` |
+| Partition Scheme: Minimal SPIFFS | `board_build.partitions = min_spiffs.csv` |
+| Serial monitor baud: 115200 | `monitor_speed = 115200` |
+| Framework: Arduino | `framework = arduino` |
+
+### Project layout
+
+| Arduino IDE | PlatformIO |
+|---|---|
+| `MySketch.ino` | `src/main.cpp` |
+| Extra tabs in the sketch | Separate files in `src/` or `lib/` folders |
+| `~/Arduino/libraries/` | `lib/` folder in the project (auto-detected) |
+| Constants at top of `.ino` | `include/config.h` |
+| Board package URL in Preferences | `platform = espressif32` in `platformio.ini` (auto-downloaded) |
 
 ---
 
 ## Troubleshooting
 
-### "MS5837.h: No such file or directory"
+### PlatformIO extension is not loading
 
-The BlueRobotics library is not installed. Go to **Sketch > Include Library >
-Manage Libraries**, search for **MS5837**, and install it.
+- Close and reopen VS Code.
+- Check the bottom toolbar — if you see the PlatformIO icons (house, checkmark,
+  arrow), it is loaded.
+- If not, go to Extensions, find PlatformIO IDE, and check that it says
+  **Enabled**. Try clicking **Disable** then **Enable** and reload.
 
-### "config.h: No such file or directory"
+### First build is very slow
 
-You need to copy `include/config.h` into your Arduino libraries folder as
-described in [Step 4A](#option-a-copy-libraries-to-arduino-libraries-folder).
+This is normal. PlatformIO is downloading the ESP32 toolchain (~300 MB) and
+the MS5837 library. Subsequent builds are much faster (typically a few seconds
+for incremental changes).
 
-### "FloatStepper.h: No such file or directory" (or any project header)
+### "No such file or directory: platformio.ini"
 
-The project libraries are not in your Arduino libraries folder. Follow
-[Step 4A](#option-a-copy-libraries-to-arduino-libraries-folder) to copy them.
+You opened the wrong folder. Go to **File > Open Folder** and select the
+`profiling-float-new` folder (the one that contains `platformio.ini`).
 
-### Compilation errors about redefined symbols
+### Build succeeds but upload fails
 
-If you used Option B (flattening), you probably left in duplicate `#include`
-lines or include guards. Make sure each header's content appears only once.
+- Check that the ESP32 is plugged in via USB.
+- Hold the **BOOT** button while the upload starts.
+- Try a different USB cable (charge-only cables will not work).
+- On Windows, install the CP2102 or CH340 USB-to-serial driver.
 
-### Upload fails with "Failed to connect to ESP32"
+### "Error: Please specify upload_port"
 
-1. Hold the **BOOT** button on the ESP32 while the upload starts.
-2. Try a different USB cable (charge-only cables will not work).
-3. Try lowering the upload speed to 115200 in **Tools > Upload Speed**.
-4. On Windows, install the CP2102 or CH340 USB driver.
+PlatformIO could not auto-detect the serial port. Plug in the ESP32 and try
+again. If it still fails, find the port manually:
+
+- **Windows**: Open Device Manager and look under "Ports (COM & LPT)"
+- **macOS**: Run `ls /dev/cu.usb*` in a terminal
+- **Linux**: Run `ls /dev/ttyUSB*` or `ls /dev/ttyACM*` in a terminal
+
+Then add it to `platformio.ini`:
+```ini
+upload_port = COM3        ; Windows example
+; upload_port = /dev/ttyUSB0  ; Linux example
+```
 
 ### "ERROR: MS5837 sensor not detected. Halting."
 
-The pressure sensor is not responding. Check:
+This is a hardware issue, not a PlatformIO issue. The pressure sensor is not
+responding. Check:
 - SDA is connected to GPIO21, SCL to GPIO22.
 - The sensor is powered from **3.3V**, not 5V.
 - The I2C wires are not loose.
 
-### WiFi network does not appear after upload
-
-This usually means the firmware halted during setup (most likely the sensor
-failed to initialise). Open the serial monitor to see what error message is
-printed.
+If you only want to test the motor without the sensor, upload a test sketch
+instead:
+```bash
+pio run -e test_manual_stepper -t upload
+```
 
 ### Serial monitor shows garbage characters
 
-The baud rate is wrong. Set it to **115200** in the serial monitor dropdown.
+The baud rate might not match. PlatformIO reads it from `platformio.ini`
+(`monitor_speed = 115200`), so this should be automatic. If you opened the
+serial monitor from outside PlatformIO (e.g., a separate terminal app), make
+sure to set 115200 baud manually.
 
----
+### WiFi network does not appear
 
-## Differences from PlatformIO
+The firmware probably halted during setup. Open the serial monitor
+(`pio device monitor`) to see the error message. The most common cause is the
+pressure sensor not being detected.
 
-If you are reading the main README or other documentation and see PlatformIO
-commands, here is what they translate to in the Arduino IDE:
+### I want to go back to using the Arduino IDE
 
-| PlatformIO command | Arduino IDE equivalent |
-|---|---|
-| `pio run` | Click **Verify** (checkmark icon) or Ctrl+R |
-| `pio run -t upload` | Click **Upload** (arrow icon) or Ctrl+U |
-| `pio device monitor` | **Tools > Serial Monitor** |
-| `pio run -e test_pressure -t upload` | Open the test sketch as a separate `.ino` file and upload it |
-| `lib_deps` in `platformio.ini` | Install libraries via **Sketch > Include Library > Manage Libraries** |
-| `board_build.partitions = min_spiffs.csv` | Set **Tools > Partition Scheme** to "Minimal SPIFFS" |
-| `monitor_speed = 115200` | Set serial monitor baud rate to 115200 |
-| `upload_speed = 921600` | Set **Tools > Upload Speed** to 921600 |
-
-The key difference is that PlatformIO automatically finds the library files in
-the `lib/` folder, while the Arduino IDE needs them in its own libraries
-directory (or flattened into the sketch).
+See the [Arduino IDE instructions](README.md#option-b-arduino-ide) in the main
+README. Note that you will need to manually copy the library files and rename
+`main.cpp` to a `.ino` file — PlatformIO handles all of this automatically,
+which is why it is recommended.
