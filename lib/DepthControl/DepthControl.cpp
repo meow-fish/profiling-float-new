@@ -85,7 +85,9 @@ void DepthController::runDepthHold(const DiveParams& params) {
     int maxSteps = params.targetDepthSteps + params.holdRangeSteps;
 
     while ((millis() - startTime) < params.holdDurationMs) {
-        _sensor->read();
+        // Use cached pressure from sensorTask (Core 0) instead of calling
+        // _sensor->read() here — concurrent I2C access from two cores can
+        // corrupt data or lock the bus.
         float error    = _sensor->getPressure() - targetPressure;
         int   stepCount = _stepper->getStepCount();
 
