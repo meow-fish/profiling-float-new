@@ -1,18 +1,78 @@
 # Linear Actuator Migration Guide
 
-This document describes the code changes required to replace the **stepper motor + A4988 driver** with a **DC linear actuator controlled via an H-bridge** (e.g. L298N or BTS7960).
+This document describes the code changes required to replace the **stepper motor + A4988 driver** with a **DC linear actuator controlled via a TB6612FNG dual H-bridge driver**.
+
+---
+
+## TB6612FNG Motor Driver
+
+The [TB6612FNG](https://www.sparkfun.com/products/14450) is a dual-channel MOSFET H-bridge driver. We use one channel (A) to drive the linear actuator.
+
+### Specifications
+
+| Parameter | Value |
+|-----------|-------|
+| Motor supply voltage (VM) | 2.7 V – 13.5 V |
+| Logic supply voltage (VCC) | 2.7 V – 5.5 V |
+| Max output current (per channel) | 1.2 A continuous, 3.2 A peak |
+| Efficiency | 91 – 95 % |
+| Control method | MOSFET H-bridge |
+
+### TB6612FNG Pinout (Channel A only)
+
+| TB6612FNG Pin | Function | Connect to |
+|---------------|----------|------------|
+| **VM** | Motor power supply | Battery positive (up to 13.5 V) |
+| **VCC** | Logic power | ESP32 3.3 V |
+| **GND** | Ground | Common ground (battery + ESP32) |
+| **STBY** | Standby (active LOW = sleep) | Tie to VCC or a GPIO (must be HIGH to operate) |
+| **AIN1** | Direction input 1 | ESP32 GPIO |
+| **AIN2** | Direction input 2 | ESP32 GPIO |
+| **PWMA** | Speed control (PWM) | ESP32 GPIO (LEDC PWM output) |
+| **A01** | Motor output 1 | Linear actuator wire 1 |
+| **A02** | Motor output 2 | Linear actuator wire 2 |
+
+### Control Truth Table
+
+| AIN1 | AIN2 | PWMA | Actuator Action |
+|------|------|------|-----------------|
+| HIGH | LOW | PWM | **Extend** (or retract — depends on wiring) |
+| LOW | HIGH | PWM | **Retract** (or extend — depends on wiring) |
+| LOW | LOW | — | **Coast** (motor freewheels) |
+| HIGH | HIGH | — | **Brake** (motor shorts, active stop) |
+| — | — | LOW | **Stop** (regardless of AIN1/AIN2) |
+
+### Suggested ESP32 GPIO Mapping
+
+| Signal | GPIO | Notes |
+|--------|------|-------|
+| AIN1 | GPIO4 (was PIN_STEP) | Reuses existing PCB trace if possible |
+| AIN2 | GPIO5 (was PIN_DIR) | Reuses existing PCB trace if possible |
+| PWMA | GPIO16 | Any PWM-capable GPIO; uses ESP32 LEDC channel |
+| STBY | Tied to VCC | Or GPIO if sleep mode is desired |
+| Limit Bottom | GPIO13 | Unchanged |
+| Limit Top | GPIO14 | Unchanged |
+
+### Wiring Notes
+
+- **STBY must be HIGH** for the driver to operate. Tie directly to VCC for simplicity, or connect to a GPIO if you want software-controlled sleep mode.
+- **VM and VCC** need separate decoupling capacitors (100 µF electrolytic on VM, 100 nF ceramic on VCC recommended).
+- The motor direction (which wire = extend vs retract) depends on actuator wiring to A01/A02 — swap the wires if the direction is reversed.
+- Channel B (BIN1/BIN2/PWMB/B01/B02) is unused and can be left unconnected.
 
 ---
 
 ## Hardware Change Summary
 
-| Aspect | Current (Stepper) | New (Linear Actuator) |
-|--------|-------------------|----------------------|
-| Driver | A4988 step/dir driver | H-bridge (L298N / BTS7960) |
-| Control signals | STEP pulse + DIR pin | IN1 + IN2 direction pins + EN (PWM speed) |
+| Aspect | Current (Stepper + A4988) | New (Linear Actuator + TB6612FNG) |
+|--------|---------------------------|----------------------------------|
+| Driver IC | A4988 stepper driver | TB6612FNG MOSFET H-bridge |
+| Control signals | STEP pulse + DIR pin (2 GPIOs) | AIN1 + AIN2 + PWMA (3 GPIOs) |
 | Motion | Discrete step pulses | Continuous DC drive |
-| Speed control | Microsecond pulse timing | PWM duty cycle (0–255) |
+| Speed control | Microsecond pulse timing | PWM duty cycle (0–255) on PWMA pin |
 | Position tracking | Step counter | Limit switches only (potentiometer feedback optional) |
+| Standby/enable | Not applicable | STBY pin (tie HIGH or use GPIO) |
+| Max current | 2 A (A4988) | 1.2 A continuous / 3.2 A peak (TB6612FNG) |
 
 ---
 
@@ -24,10 +84,10 @@ This document describes the code changes required to replace the **stepper motor
 
 The entire HAL is stepper-specific: LEDC pulse generation, step counting, microsecond timing. The new driver needs:
 
-- **Init**: configure IN1, IN2, EN (PWM), and limit switch pins
-- **extend() / retract() / stop()**: basic directional control via H-bridge
-- **runToLimit(direction)**: drive continuously until a limit switch triggers (same concept, different implementation — set direction pins instead of starting LEDC pulses)
-- **setSpeed(dutyCycle)**: PWM duty cycle 0–255 on the EN pin (replaces microsecond step delay)
+- **Init**: configure AIN1, AIN2, PWMA, and limit switch pins
+- **extend() / retract() / stop()**: set AIN1/AIN2 per the TB6612FNG truth table, control speed via PWMA
+- **runToLimit(direction)**: drive continuously until a limit switch triggers (same concept, different implementation — set AIN1/AIN2 direction + PWMA duty instead of LEDC step pulses)
+- **setSpeed(dutyCycle)**: PWM duty cycle 0–255 on the PWMA pin (replaces microsecond step delay)
 - **isAtLimit(bottom)**: unchanged — same limit switch logic
 - **Remove**: `stepBatch()`, `getStepCount()`, `resetStepCount()`, `pulseStep()`, all LEDC code
 
@@ -35,7 +95,9 @@ The entire HAL is stepper-specific: LEDC pulse generation, step counting, micros
 
 **Lines 8–10** — Replace pin definitions:
 ```
-PIN_STEP / PIN_DIR  →  PIN_ACTUATOR_IN1 / PIN_ACTUATOR_IN2 / PIN_ACTUATOR_EN
+PIN_STEP  →  PIN_AIN1   (TB6612FNG AIN1)
+PIN_DIR   →  PIN_AIN2   (TB6612FNG AIN2)
+(new)        PIN_PWMA   (TB6612FNG PWMA — speed PWM)
 ```
 
 **Lines 31–33** — Replace motor parameters:
@@ -76,7 +138,7 @@ _stepper->runToLimit(false)  →  _actuator->runToLimit(false)
 Minimal changes:
 - **Line 8**: `#include "FloatStepper.h"` → `#include "LinearActuator.h"`
 - **Line 15**: `FloatStepper stepper` → `LinearActuator actuator`
-- **Line 103**: `stepper.init(PIN_STEP, PIN_DIR, ...)` → `actuator.init(PIN_ACTUATOR_IN1, PIN_ACTUATOR_IN2, PIN_ACTUATOR_EN, ...)`
+- **Line 103**: `stepper.init(PIN_STEP, PIN_DIR, ...)` → `actuator.init(PIN_AIN1, PIN_AIN2, PIN_PWMA, ...)`
 - **Line 107**: `depthController.init(stepper, sensor)` → `depthController.init(actuator, sensor)`
 
 ### 5. Web Server — `lib/Network/FloatWebServer.h` and `FloatWebServer.cpp`
@@ -104,10 +166,11 @@ Replace STEP/DIR pulse toggling with extend/retract cycling using the new driver
 
 ### 8. Documentation — `TESTING_GUIDE.md`, `README.md`
 
-- A4988 wiring instructions → H-bridge wiring instructions
+- A4988 wiring instructions → TB6612FNG wiring (AIN1/AIN2/PWMA/STBY, VM/VCC decoupling)
 - Step/direction terminology → extend/retract terminology
-- Pin assignment tables → updated GPIO mapping
-- Current limit calibration (A4988 potentiometer) → H-bridge specific setup
+- Pin assignment tables → updated GPIO mapping (3 control pins instead of 2)
+- Current limit calibration (A4988 potentiometer) → remove (TB6612FNG has built-in current limiting)
+- Add note about STBY pin (must be HIGH for operation)
 
 ---
 
